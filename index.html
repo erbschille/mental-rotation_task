@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mental Rotation Task</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f0f0f0;color:#1a1a1a}
+#app{max-width:900px;margin:0 auto;padding:32px 20px;text-align:center}
+.card{background:#fff;border-radius:10px;padding:36px 44px;box-shadow:0 2px 16px rgba(0,0,0,.1);text-align:left;line-height:1.7;font-size:16px}
+.card h2{margin-top:0}
+.btn{display:block;margin:24px auto 0;padding:12px 36px;font-size:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:#3a7bd5;color:#fff;border:none;border-radius:8px;cursor:pointer}
+.btn:hover{background:#2f67ba}
+input{font-size:20px;padding:8px 14px;width:200px;text-align:center;border:2px solid #ddd;border-radius:7px}
+#stage{min-height:460px;display:flex;align-items:center;justify-content:center}
+#stage img{max-width:100%;max-height:440px}
+#fix{font-size:56px}
+#fb{font-size:34px;font-weight:700}
+#keys{color:#555;margin-top:8px}
+kbd{display:inline-block;padding:2px 9px;font-family:monospace;font-size:14px;background:#f4f4f4;border:1px solid #ccc;border-bottom:2px solid #999;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ───────── Settings ───────── */
+const params   = new URLSearchParams(location.search);
+const EMBEDDED = params.get('embedded') === '1';          // inside a Qualtrics iframe
+let   PID      = params.get('pid') || '';                 // participant ID passed from Qualtrics
+const IMG_DIR  = params.get('img') || 'images/';          // where the PNGs live
+const KEY_SAME = (params.get('same') || 's').toLowerCase();   // optional counterbalancing: &same=d&diff=s
+const KEY_DIFF = (params.get('diff') || 'd').toLowerCase();
+const FIX_MS = 500, TIMEOUT_MS = 6000, FB_MS = 800;
+const MAIN_CSV = 'mr_main_trials.csv', PRACTICE_CSV = 'mr_practice_trials.csv';
+
+/* ───────── Helpers ───────── */
+const app = document.getElementById('app');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const raf2  = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+const show  = html => { app.innerHTML = html; };
+const keyLabel = k => k.toUpperCase();
+const keyLegend = '<p id="keys"><kbd>' + keyLabel(KEY_SAME) + '</kbd> = same &nbsp;&nbsp; <kbd>' + keyLabel(KEY_DIFF) + '</kbd> = different</p>';
+
+function parseCSV(text) {
+  const rows = text.trim().split(/\r?\n/).map(l => l.split(',').map(s => s.replace(/^"|"$/g, '').trim()));
+  const head = rows.shift();
+  return rows.map(r => Object.fromEntries(head.map((k, i) => [k, r[i]])));
+}
+async function loadTrials(path) {
+  let res;
+  try { res = await fetch(path); }
+  catch (e) { throw new Error('Could not load ' + path + '. Browsers block this when the page is opened by double-clicking (file://). Open it from a web server (hosted URL or a local server) instead.'); }
+  if (!res.ok) throw new Error('Could not load ' + path + ' (HTTP ' + res.status + ').');
+  return parseCSV(await res.text()).map(r => ({
+    file: r.file.replace(/\.bmp$/i, '.png'),
+    correct: r.correct, angle: +r.angle, axis: r.axis, match: r.match, stim: r.stim
+  }));
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function preload(trials) {
+  return Promise.all(trials.map(t => new Promise(res => {
+    const im = new Image(); im.onload = () => res(true); im.onerror = () => res(false); im.src = IMG_DIR + t.file;
+  })));
+}
+function waitKeys(keys) {
+  return new Promise(res => {
+    const h = e => { const k = e.key.toLowerCase(); if (keys.includes(k)) { document.removeEventListener('keydown', h); res(k); } };
+    document.addEventListener('keydown', h);
+  });
+}
+function screen(title, body, btnText) {
+  show('<div class="card"><h2>' + title + '</h2>' + body + '</div><button class="btn" id="go">' + btnText + '</button>');
+  return new Promise(res => document.getElementById('go').addEventListener('click', res, { once: true }));
+}
+
+/* ───────── One trial ───────── */
+async function runTrial(t, feedback, n) {
+  const stage = document.getElementById('stage');
+  stage.innerHTML = '<div id="fix">+</div>';
+  await sleep(FIX_MS);
+  stage.innerHTML = '<img src="' + IMG_DIR + t.file + '">';
+  await raf2();                                   // start the clock when the image is actually painted
+  const t0 = performance.now();
+  const r = await new Promise(res => {
+    const h = e => {
+      const k = e.key.toLowerCase();
+      if (k === KEY_SAME || k === KEY_DIFF) { done({ resp: k === KEY_SAME ? 'same' : 'different', rt: performance.now() - t0 }); }
+    };
+    const to = setTimeout(() => done({ resp: 'timeout', rt: null }), TIMEOUT_MS);
+    function done(x) { document.removeEventListener('keydown', h); clearTimeout(to); res(x); }
+    document.addEventListener('keydown', h);
+  });
+  const acc = r.resp === t.correct ? 1 : 0;
+  if (feedback) {
+    const txt = r.resp === 'timeout' ? ['Too slow', '#999'] : acc ? ['Correct', 'green'] : ['Incorrect', 'red'];
+    stage.innerHTML = '<div id="fb" style="color:' + txt[1] + '">' + txt[0] + '</div>';
+    await sleep(FB_MS);
+  }
+  return { trial: n, file: t.file, angle: t.angle, axis: t.axis, match: t.match, correct: t.correct,
+           resp: r.resp, acc: acc, rt: r.rt === null ? 'NA' : Math.round(r.rt), stim: t.stim };
+}
+async function runBlock(trials, feedback) {
+  show('<div id="stage"></div>' + keyLegend);
+  const out = [];
+  for (let i = 0; i < trials.length; i++) out.push(await runTrial(trials[i], feedback, i + 1));
+  return out;
+}
+
+/* ───────── Summary + output ───────── */
+function summarize(rows) {
+  const correctSame = rows.filter(r => r.acc === 1 && r.match === 'match' && r.rt !== 'NA');
+  const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
+  let slope = NaN;
+  if (correctSame.length > 2) {                    // RT-by-angle slope (ms per degree), correct "same" trials
+    const mx = mean(correctSame.map(r => r.angle)), my = mean(correctSame.map(r => r.rt));
+    const num = correctSame.reduce((s, r) => s + (r.angle - mx) * (r.rt - my), 0);
+    const den = correctSame.reduce((s, r) => s + (r.angle - mx) ** 2, 0);
+    slope = den ? num / den : NaN;
+  }
+  const r2 = x => Number.isNaN(x) ? 'NA' : Math.round(x * 1000) / 1000;
+  return {
+    n_trials: rows.length,
+    n_timeouts: rows.filter(r => r.resp === 'timeout').length,
+    acc: r2(rows.filter(r => r.acc === 1).length / rows.length),
+    mean_rt_correct: r2(mean(rows.filter(r => r.acc === 1 && r.rt !== 'NA').map(r => r.rt))),
+    slope_ms_per_deg: r2(slope)
+  };
+}
+const COLS = ['trial', 'file', 'angle', 'axis', 'match', 'correct', 'resp', 'acc', 'rt', 'stim'];
+function finish(rows) {
+  const summary = summarize(rows);
+  const full = rows.map(r => COLS.map(c => r[c]).join('|')).join(';');   // trial|file|angle|axis|match|correct|resp|acc|rt|stim
+  if (EMBEDDED && window.parent !== window) {
+    window.parent.postMessage({ type: 'task_complete', task: 'mentalrotation', data: { trials: full, summary: summary } }, '*');
+    show('<div class="card"><h2>Task complete</h2><p>Thank you. Please wait a moment while the survey continues.</p></div>');
+  } else {
+    const csv = [['participant_id'].concat(COLS).join(',')].concat(rows.map(r => [PID].concat(COLS.map(c => r[c])).join(','))).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'mental_rotation_' + (PID || 'unknown') + '.csv';
+    a.click();
+    show('<div class="card"><h2>Task complete</h2><p>Your data file has been downloaded.</p></div>');
+  }
+}
+
+/* ───────── Flow ───────── */
+async function main() {
+  try {
+    if (!PID && !EMBEDDED) {
+      show('<div class="card"><h2>Mental Rotation Task</h2><p>Enter the participant ID to begin.</p><p style="text-align:center"><input id="pid" placeholder="e.g. P001" autocomplete="off"></p></div><button class="btn" id="go">Begin</button>');
+      await new Promise(res => document.getElementById('go').addEventListener('click', () => {
+        const v = document.getElementById('pid').value.trim(); if (v) { PID = v; res(); }
+      }));
+    }
+    show('<div class="card"><p>Loading...</p></div>');
+    const practice = await loadTrials(PRACTICE_CSV);
+    const main = shuffle(await loadTrials(MAIN_CSV));
+    const ok = await preload(practice.concat(main));
+    if (ok.includes(false)) { show('<div class="card"><h2>Loading problem</h2><p>Some images failed to load. Please refresh the page.</p></div>'); return; }
+
+    await screen('Instructions',
+      '<p>On each trial you will see two objects. The one on the right may be rotated. Decide whether the two objects are the <b>same</b> object (just rotated) or <b>different</b> objects.</p>' +
+      '<p>Press <kbd>' + keyLabel(KEY_SAME) + '</kbd> if they are the <b>same</b> and <kbd>' + keyLabel(KEY_DIFF) + '</kbd> if they are <b>different</b>. Rest your fingers on these keys and respond as quickly and accurately as you can.</p>' +
+      '<p>First you will do a few practice trials with feedback.</p>', 'Start practice');
+    await runBlock(practice, true);
+
+    await screen('Ready?', '<p>The real task starts now. There is no feedback from here on. Respond as quickly and accurately as you can.</p>', 'Begin task');
+    finish(await runBlock(main, false));
+  } catch (err) {
+    show('<div class="card"><h2>Error</h2><p>' + err.message + '</p></div>');
+  }
+}
+main();
+</script>
+</body>
+</html>

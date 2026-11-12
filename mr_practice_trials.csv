@@ -1,0 +1,5 @@
+url,file,correct,angle,axis,match,stim
+https://stanforduniversity.qualtrics.com/ControlPanel/Graphic.php?IM=IM_TqWg4eVnc0VA3bL,18_match_y_30.bmp,same,30,y,match,18
+https://stanforduniversity.qualtrics.com/ControlPanel/Graphic.php?IM=IM_x3z89IdpqBEkOFN,19_nomatch_y_60.bmp,different,60,y,nomatch,19
+https://stanforduniversity.qualtrics.com/ControlPanel/Graphic.php?IM=IM_bMpMcBSX2KFzTfe,18_nomatch_x_90.bmp,different,90,x,nomatch,18
+https://stanforduniversity.qualtrics.com/ControlPanel/Graphic.php?IM=IM_g6noLb13a3F1PDx,19_match_x_120.bmp,same,120,x,match,19
