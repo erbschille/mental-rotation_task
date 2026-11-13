@@ -18,10 +18,19 @@ input{font-size:20px;padding:8px 14px;width:200px;text-align:center;border:2px s
 #fix{font-size:56px}
 #fb{font-size:34px;font-weight:700}
 #keys{color:#555;margin-top:8px}
+/* Timer bar: drains over the response window; orange in the last third, red in the last sixth */
+#hud{position:sticky;top:0;z-index:100;background:#fff;border-bottom:2px solid #e0e0e0;display:none;align-items:center;gap:16px;padding:10px 20px}
+#hud-label{font-size:14px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#555;min-width:110px;text-align:left}
+#hud-track{flex:1;height:14px;background:#e8e8e8;border-radius:7px;overflow:hidden}
+#hud-fill{height:100%;width:100%;background:#3a7bd5;border-radius:7px}
+#hud-fill.run{animation:hudDrain var(--dur,6000ms) linear forwards}
+@keyframes hudDrain{0%{width:100%;background:#3a7bd5}66%{background:#3a7bd5}67%{background:#e67e22}83%{background:#e67e22}84%{background:#e74c3c}100%{width:0%;background:#e74c3c}}
+#hud-count{font-size:14px;color:#888;min-width:110px;text-align:right;font-variant-numeric:tabular-nums}
 kbd{display:inline-block;padding:2px 9px;font-family:monospace;font-size:14px;background:#f4f4f4;border:1px solid #ccc;border-bottom:2px solid #999;border-radius:4px}
 </style>
 </head>
 <body>
+<div id="hud"><span id="hud-label"></span><div id="hud-track"><div id="hud-fill"></div></div><span id="hud-count"></span></div>
 <div id="app"></div>
 
 <script>
@@ -29,6 +38,8 @@ kbd{display:inline-block;padding:2px 9px;font-family:monospace;font-size:14px;ba
 const params   = new URLSearchParams(location.search);
 const EMBEDDED = params.get('embedded') === '1';          // inside a Qualtrics iframe
 let   PID      = params.get('pid') || '';                 // participant ID passed from Qualtrics
+const SESSION  = params.get('session') || '';             // 1 = pre-training, 2 = post-training
+const SHOW_TIMER = params.get('timer') === '1';           // countdown bar is OFF by default; add &timer=1 to show it
 const IMG_DIR  = params.get('img') || 'images/';          // where the PNGs live
 const KEY_SAME = (params.get('same') || 's').toLowerCase();   // optional counterbalancing: &same=d&diff=s
 const KEY_DIFF = (params.get('diff') || 'd').toLowerCase();
@@ -40,6 +51,7 @@ const app = document.getElementById('app');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const raf2  = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 const show  = html => { app.innerHTML = html; };
+const hud   = document.getElementById('hud'), hudFill = document.getElementById('hud-fill');
 const keyLabel = k => k.toUpperCase();
 const keyLegend = '<p id="keys"><kbd>' + keyLabel(KEY_SAME) + '</kbd> = same &nbsp;&nbsp; <kbd>' + keyLabel(KEY_DIFF) + '</kbd> = different</p>';
 
@@ -74,17 +86,21 @@ function waitKeys(keys) {
   });
 }
 function screen(title, body, btnText) {
+  hud.style.display = 'none';
   show('<div class="card"><h2>' + title + '</h2>' + body + '</div><button class="btn" id="go">' + btnText + '</button>');
   return new Promise(res => document.getElementById('go').addEventListener('click', res, { once: true }));
 }
 
 /* ───────── One trial ───────── */
-async function runTrial(t, feedback, n) {
+async function runTrial(t, feedback, n, total) {
   const stage = document.getElementById('stage');
+  hudFill.classList.remove('run');                // bar back to full during the fixation cross
+  document.getElementById('hud-count').textContent = n + ' / ' + total;
   stage.innerHTML = '<div id="fix">+</div>';
   await sleep(FIX_MS);
   stage.innerHTML = '<img src="' + IMG_DIR + t.file + '">';
   await raf2();                                   // start the clock when the image is actually painted
+  if (SHOW_TIMER) { hudFill.style.setProperty('--dur', TIMEOUT_MS + 'ms'); hudFill.classList.add('run'); }
   const t0 = performance.now();
   const r = await new Promise(res => {
     const h = e => {
@@ -95,6 +111,7 @@ async function runTrial(t, feedback, n) {
     function done(x) { document.removeEventListener('keydown', h); clearTimeout(to); res(x); }
     document.addEventListener('keydown', h);
   });
+  hudFill.classList.remove('run');
   const acc = r.resp === t.correct ? 1 : 0;
   if (feedback) {
     const txt = r.resp === 'timeout' ? ['Too slow', '#999'] : acc ? ['Correct', 'green'] : ['Incorrect', 'red'];
@@ -104,10 +121,13 @@ async function runTrial(t, feedback, n) {
   return { trial: n, file: t.file, angle: t.angle, axis: t.axis, match: t.match, correct: t.correct,
            resp: r.resp, acc: acc, rt: r.rt === null ? 'NA' : Math.round(r.rt), stim: t.stim };
 }
-async function runBlock(trials, feedback) {
+async function runBlock(trials, feedback, label) {
+  document.getElementById('hud-label').textContent = label;
+  document.getElementById('hud-track').style.visibility = SHOW_TIMER ? 'visible' : 'hidden';
+  hud.style.display = 'flex';
   show('<div id="stage"></div>' + keyLegend);
   const out = [];
-  for (let i = 0; i < trials.length; i++) out.push(await runTrial(trials[i], feedback, i + 1));
+  for (let i = 0; i < trials.length; i++) out.push(await runTrial(trials[i], feedback, i + 1, trials.length));
   return out;
 }
 
@@ -134,12 +154,15 @@ function summarize(rows) {
 const COLS = ['trial', 'file', 'angle', 'axis', 'match', 'correct', 'resp', 'acc', 'rt', 'stim'];
 function finish(rows) {
   const summary = summarize(rows);
-  const full = rows.map(r => COLS.map(c => r[c]).join('|')).join(';');   // trial|file|angle|axis|match|correct|resp|acc|rt|stim
+  hud.style.display = 'none';
+  // Compact copy for Qualtrics: one record per trial in the order shown, records joined by ";", fields by "|":
+  //   file (no extension; encodes object/match/axis/angle) | response S=same D=different T=timeout | accuracy 0/1 | rt in ms (blank = timeout)
+  const full = rows.map(r => [r.file.replace(/\.png$/i, ''), r.resp === 'same' ? 'S' : r.resp === 'different' ? 'D' : 'T', r.acc, r.rt === 'NA' ? '' : r.rt].join('|')).join(';');
   if (EMBEDDED && window.parent !== window) {
     window.parent.postMessage({ type: 'task_complete', task: 'mentalrotation', data: { trials: full, summary: summary } }, '*');
     show('<div class="card"><h2>Task complete</h2><p>Thank you. Please wait a moment while the survey continues.</p></div>');
   } else {
-    const csv = [['participant_id'].concat(COLS).join(',')].concat(rows.map(r => [PID].concat(COLS.map(c => r[c])).join(','))).join('\n');
+    const csv = [['participant_id', 'session'].concat(COLS).join(',')].concat(rows.map(r => [PID, SESSION].concat(COLS.map(c => r[c])).join(','))).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     a.download = 'mental_rotation_' + (PID || 'unknown') + '.csv';
@@ -150,6 +173,7 @@ function finish(rows) {
 
 /* ───────── Flow ───────── */
 async function main() {
+  window.focus();
   try {
     if (!PID && !EMBEDDED) {
       show('<div class="card"><h2>Mental Rotation Task</h2><p>Enter the participant ID to begin.</p><p style="text-align:center"><input id="pid" placeholder="e.g. P001" autocomplete="off"></p></div><button class="btn" id="go">Begin</button>');
@@ -167,10 +191,10 @@ async function main() {
       '<p>On each trial you will see two objects. The one on the right may be rotated. Decide whether the two objects are the <b>same</b> object (just rotated) or <b>different</b> objects.</p>' +
       '<p>Press <kbd>' + keyLabel(KEY_SAME) + '</kbd> if they are the <b>same</b> and <kbd>' + keyLabel(KEY_DIFF) + '</kbd> if they are <b>different</b>. Rest your fingers on these keys and respond as quickly and accurately as you can.</p>' +
       '<p>First you will do a few practice trials with feedback.</p>', 'Start practice');
-    await runBlock(practice, true);
+    await runBlock(practice, true, 'Practice');
 
     await screen('Ready?', '<p>The real task starts now. There is no feedback from here on. Respond as quickly and accurately as you can.</p>', 'Begin task');
-    finish(await runBlock(main, false));
+    finish(await runBlock(main, false, 'Task'));
   } catch (err) {
     show('<div class="card"><h2>Error</h2><p>' + err.message + '</p></div>');
   }
