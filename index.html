@@ -652,7 +652,13 @@ pidInput.addEventListener('keydown', e => { if (e.key === 'Enter') launch(); });
 pidInput.addEventListener('input', () => pidInput.classList.remove('error'));
 
 if (CHECK) loaded.then(showCheck);
-else if (URL_PID || EMBEDDED) { pidInput.value = URL_PID || 'unknown'; launch(); }
+else if (URL_PID || EMBEDDED) {
+  // ID came from the URL (e.g. Qualtrics): never show the ID screen, just a loading
+  // message while the pictures load (they can take a moment on a slow connection).
+  pidInput.value = URL_PID || 'unknown';
+  document.querySelector('.pre-card').innerHTML = '<p id="load-msg" style="margin:0">Loading&hellip;</p>';
+  launch();
+}
 </script>
 </body>
 </html>
