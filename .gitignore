@@ -1,0 +1,10 @@
+# The real test is never committed (conditions of use: do not share the items).
+/config.js
+/stimuli/*
+!/stimuli/README.txt
+
+.DS_Store
+
+# compiled helper for tools/crop_items.py
+tools/.build/
+.Rhistory
