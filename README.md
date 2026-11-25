@@ -16,60 +16,6 @@ This is a mental imagery outcome measure, intended to be given both pre- and pos
 | `tools/crop_items.py` | Crops the items out of a PDF of the test, on your own computer (see below). |
 | `tools/fill_answers.py` | Fills in the answer key in `config.js` from a pasted text file (see below). |
 
-## Setting up the real test
-
-1. Copy `config.example.js` to `config.js`.
-2. Put the pictures in `stimuli/`. Each item can be either:
-   - **separate pictures:** one target picture and four option pictures (`target` plus `options`), or
-   - **one picture of the whole row** (`image`). The picture must show the A–D labels, and participants click A–D buttons under it.
-   You can use different layouts for different items.
-3. Fill in `config.js`: the instruction pages, practice items, each item's file names and its correct letters (`answer: ["A", "C"]`). Instruction pages can mix text and rows of pictures (`blocks`). Practice pages can show feedback after "Check my answer" (`feedback`).
-4. Open `index.html?check=1` (via a local server, e.g. `python3 -m http.server` then <http://localhost:8000/?check=1>, or by double-clicking `index.html` and adding `?check=1` to the address). This shows every item with its correct options outlined in green. It also lists config problems, such as missing pictures or answers with the wrong number of letters. This view only opens on your own computer, not on a hosted copy.
-5. Run through the task yourself once, then check the CSV.
-
-### Cropping the items from a PDF
-
-If your copy of the test is a PDF whose figures are drawn in frames (like the MRT-A), `tools/crop_items.py` finds every row of 5 framed figures (target + 4 options) and saves them with the file names `config.js` expects (`item01_target.png`, `item01_A.png` … `item24_D.png`). It runs entirely on your Mac (macOS PDF engine plus numpy) and saves into the `stimuli/` folder.
-
-```bash
-python3 tools/crop_items.py ~/path/to/test.pdf --pages 3-6 --dry-run
-```
-
-`--dry-run` only reports what it finds, e.g. `Page 3: 6 item row(s) -> items 1–6`. Use `--pages` to skip the instruction pages, or their example figures will be counted as items. When the report shows 6 items per page and 24 in all, run it again without `--dry-run`. Rows with a different number of figures are skipped and listed under "Check these". Other options: `--start` (first item number), `--prefix`, `--out`, `--per-row`, `--dpi`. Then fill in the answers and check everything with `?check=1`.
-
-### Filling in the answer key
-
-Paste the key into `stimuli/answers.txt` in the form `1ab 2cd …`, one or several per line (`4. B C` and `5: a, d` work too). Then run:
-
-```bash
-python3 tools/fill_answers.py
-```
-
-It checks that every test item has exactly two letters and that nothing is missing or repeated. If all is well, it writes the answers into `config.js` and saves a copy of the old file to `stimuli/config.backup.js`. If anything is wrong it changes nothing and lists the problems by item number. It never prints the answers. Practice items are left alone.
-
-`stimuli/answers.txt` and `stimuli/config.backup.js` are ignored by git: the task only needs `config.js`.
-
-## Hosting
-
-**This repository contains the real test items and answer key, so it must stay private.** The test's conditions of use don't allow sharing the items. Note that a GitHub Pages site is publicly reachable even when built from a private repository, so serve the task from somewhere access-controlled, such as a university web server. Anything shown in a browser can be saved by a determined participant (right-click saving is blocked, but screenshots aren't).
-
-## Running it
-
-Same URL parameters as the paper folding task:
-
-```
-index.html?pid=K7M2QX&session=1&embedded=1
-```
-
-- `pid`: participant ID (skips the ID entry screen)
-- `session`: copied into the data (e.g. 1 = pre, 2 = post)
-- `embedded=1`: inside Qualtrics. Results are sent to the parent page with `postMessage` as `{type: "task_complete", task: "mentalrotation", data: {...}}`, and no score screen is shown.
-
-Not embedded: the score screen is shown and a CSV downloads automatically.
-
-## Flow
-
-ID entry → instruction pages (with practice items and "Check my answer" feedback) → the timed test → end. By default the 24 problems are one timed part shown on 4 pages of 6 (`itemsPerPage`), matching the paper copy. Participants can move back and forth between pages until time runs out. To give the test as separately timed parts with a break in between, list more than one part in `parts`. Participants click a figure to choose it and click again to unchoose it. They can choose up to `maxSelections` (default 2) per item. Submitting early asks for confirmation. When time runs out the part is submitted automatically. The timer runs off the real clock, so it stays accurate if the tab is in the background.
 
 ## Data
 
