@@ -3,8 +3,6 @@ Mental Rotation Task
 
 This is a mental imagery outcome measure, intended to be given both pre- and post-experiment. It is a browser version of a paper-and-pencil mental rotation test, coded in JavaScript with the assistance of Claude (Opus 5.5, November 2026). It works the same way as our [paper folding task](https://github.com/erbschille/paper-folding_task).
 
-**This repository contains no test items.** The conditions of use of the test don't allow sharing the items, so the code is a general engine. The real items, answers and instructions live in two places that git ignores: `config.js` and the `stimuli/` folder. Without them, the task runs a demo with placeholder pictures.
-
 **Collaborators or those interested in using this task should fork this repo and get the test materials from the test's authors. Please do not use our link (it will mess with data collection).**
 
 ## Files
