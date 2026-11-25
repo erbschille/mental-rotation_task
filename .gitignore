@@ -1,0 +1,13 @@
+# config.js and the stimuli pictures ARE committed so the task can run from
+# the repo. KEEP THIS REPOSITORY PRIVATE: the test's conditions of use don't
+# allow sharing the items.
+
+# Working files the task doesn't need
+/stimuli/answers.txt
+/stimuli/config.backup.js
+
+.DS_Store
+.Rhistory
+
+# compiled helper for tools/crop_items.py
+tools/.build/
