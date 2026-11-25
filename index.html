@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mental Rotation Test</title>
+<script>
+  // Runs before anything is drawn: if the ID comes from the URL (e.g. Qualtrics),
+  // hide the ID screen straight away and show "Loading…" instead, so it never flashes.
+  if (/[?&](pid=[^&]|embedded=1)/.test(location.search)) document.documentElement.classList.add('auto-start');
+</script>
+<style>
+  .auto-start .pre-card > :not(#load-msg){display:none}
+  .auto-start #load-msg{margin:0;font-size:15px;color:#999}
+  .auto-start #load-msg:empty::before{content:"Loading\2026"}
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <style>
@@ -178,9 +188,8 @@ kbd{display:inline-block;padding:2px 9px;font-family:monospace;font-size:13px;
   <button class="small-btn" id="modal-yes">Submit</button>
 </div></div>
 
-<!-- Your real test lives in config.js (and the stimuli folder it points to).
-     Neither is committed to git. If config.js is missing, the demo version
-     with placeholder pictures is loaded instead. -->
+<!-- The real test lives in config.js (and the stimuli folder it points to).
+     If config.js is missing, the demo version with placeholder pictures is loaded instead. -->
 <script src="config.js"></script>
 <script>
   if (!window.MRT_CONFIG) document.write('<script src="demo/config.js"><\/script>');
