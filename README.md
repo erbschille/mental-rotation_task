@@ -8,8 +8,9 @@ This is a mental imagery outcome measure, intended to be given both pre- and pos
 | File | What it is |
 |---|---|
 | `index.html` | The task. Open it in a browser. |
-| `config.example.js` | Template for the real test. Copy to `config.js` and fill in. |
-| `stimuli/` | Put the real test pictures here (ignored by git). |
+| `config.js` | The real test: instructions, practice items, item file names and answer key. |
+| `stimuli/` | The real test pictures. |
+| `config.example.js` | Blank template, for setting up a different test. |
 | `demo/` | Demo config and placeholder pictures, used when there's no `config.js`. |
 | `tools/make_demo.py` | Rebuilds the demo files. |
 | `tools/crop_items.py` | Crops the items out of a PDF of the test, on your own computer (see below). |
@@ -28,7 +29,7 @@ This is a mental imagery outcome measure, intended to be given both pre- and pos
 
 ### Cropping the items from a PDF
 
-If your copy of the test is a PDF whose figures are drawn in frames (like the MRT-A), `tools/crop_items.py` finds every row of 5 framed figures (target + 4 options) and saves them with the file names `config.js` expects (`item01_target.png`, `item01_A.png` … `item24_D.png`). It runs entirely on your Mac (macOS PDF engine plus numpy) and saves into the git-ignored `stimuli/` folder.
+If your copy of the test is a PDF whose figures are drawn in frames (like the MRT-A), `tools/crop_items.py` finds every row of 5 framed figures (target + 4 options) and saves them with the file names `config.js` expects (`item01_target.png`, `item01_A.png` … `item24_D.png`). It runs entirely on your Mac (macOS PDF engine plus numpy) and saves into the `stimuli/` folder.
 
 ```bash
 python3 tools/crop_items.py ~/path/to/test.pdf --pages 3-6 --dry-run
@@ -46,11 +47,11 @@ python3 tools/fill_answers.py
 
 It checks that every test item has exactly two letters and that nothing is missing or repeated. If all is well, it writes the answers into `config.js` and saves a copy of the old file to `stimuli/config.backup.js`. If anything is wrong it changes nothing and lists the problems by item number. It never prints the answers. Practice items are left alone.
 
-Before committing, `git status` should never list `config.js` or anything in `stimuli/` other than `stimuli/README.txt`.
+`stimuli/answers.txt` and `stimuli/config.backup.js` are ignored by git: the task only needs `config.js`.
 
 ## Hosting
 
-Because the real files are not in git, a GitHub Pages site built from this repo only shows the demo. To run the real test, host `index.html`, `config.js` and `stimuli/` together somewhere access-controlled, such as a university web server. Anything shown in a browser can be saved by a determined participant (right-click saving is blocked, but screenshots aren't), so check that the test's conditions of use allow online administration.
+**This repository contains the real test items and answer key, so it must stay private.** The test's conditions of use don't allow sharing the items. Note that a GitHub Pages site is publicly reachable even when built from a private repository, so serve the task from somewhere access-controlled, such as a university web server. Anything shown in a browser can be saved by a determined participant (right-click saving is blocked, but screenshots aren't).
 
 ## Running it
 
